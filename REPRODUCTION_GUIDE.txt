@@ -1,0 +1,76 @@
+================================================================================
+VOS OOD DETECTION - REPRODUCTION GUIDE
+================================================================================
+
+PREREQUISITES:
+- Conda environment "vos" installed with all dependencies
+- VOC 2007+2012 dataset at: C:\Users\anna_\OneDrive\Dokumente\Object Detection\VOC2007\VOC_0712_converted
+- COCO dataset at: C:\Users\anna_\OneDrive\Dokumente\Object Detection\TEMP_COCO
+- Model checkpoint: data/VOC-Detection/faster-rcnn/vos/random_seed_0/model_final.pth
+
+================================================================================
+CONFIGURATION FIX (REQUIRED):
+================================================================================
+
+Edit: detection/configs/VOC-Detection/faster-rcnn/vos.yaml
+
+Change line 31:
+  NUM_WORKERS: 8
+To:
+  NUM_WORKERS: 4  # Reduced to avoid worker initialization issues
+
+================================================================================
+COMMANDS:
+================================================================================
+
+# Step 1: Activate environment
+conda activate vos
+
+# Step 2: Navigate to detection directory
+cd "c:\Users\anna_\OneDrive\Dokumente\Object Detection\VOS\vos-main\detection"
+
+# Step 3: Run VOC ID inference (in-distribution data)
+python apply_net.py --config-file VOC-Detection/faster-rcnn/vos.yaml --inference-config Inference/standard_nms.yaml --test-dataset voc_custom_val --image-corruption-level 0 --random-seed 0
+
+# Step 4: Run COCO OOD inference (out-of-distribution data)
+python apply_net.py --config-file VOC-Detection/faster-rcnn/vos.yaml --inference-config Inference/standard_nms.yaml --test-dataset coco_ood_val --image-corruption-level 0 --random-seed 0 --dataset-dir "C:\Users\anna_\OneDrive\Dokumente\Object Detection\TEMP_COCO"
+
+# Step 5: Add VOS logistic regression scores
+python add_vos_scores.py
+
+# Step 6: Compute metrics (AUROC, FPR95, AUPR)
+cd ..
+python voc_coco_plot.py --name vos --thres 0.5843 --energy 1 --seed 0
+
+================================================================================
+EXPECTED RESULTS:
+================================================================================
+
+VOC ID instances: 16,854
+COCO OOD instances: 16,665
+AUROC: 98.79%
+FPR95: 3.90%
+AUPR: 98.98%
+
+================================================================================
+OUTPUT FILES:
+================================================================================
+
+VOC ID pickle:
+data/VOC-Detection/faster-rcnn/vos/random_seed_0/inference/voc_custom_val/standard_nms/corruption_level_0/probabilistic_scoring_res_odd_0.5843.pkl
+
+COCO OOD pickle:
+data/VOC-Detection/faster-rcnn/vos/random_seed_0/inference/coco_ood_val/standard_nms/corruption_level_0/probabilistic_scoring_res_odd_0.5843.pkl
+
+================================================================================
+TIMING:
+================================================================================
+
+VOC ID inference: ~30 minutes (4,952 images)
+COCO OOD inference: ~4 minutes (4,167 images)
+Add VOS scores: <1 minute
+Compute metrics: <1 second
+
+Total time: ~35 minutes
+
+================================================================================
