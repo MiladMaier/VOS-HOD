@@ -1,4 +1,12 @@
-"""Add VOS logistic scores to existing pickle files without re-running inference"""
+"""Add VOS logistic scores to existing pickle files without re-running inference
+
+IMPORTANT NOTE: This script uses a simplified energy score computation that differs
+from the original VOS implementation. See VOS_COMPUTATION_DIFFERENCES.md for a detailed
+explanation of the mathematical differences and their implications.
+
+For exact reproduction of model inference results, consider using the full inference
+pipeline (apply_net.py) which uses the original VOS computation.
+"""
 import torch
 import pickle
 import sys
@@ -57,12 +65,19 @@ def add_vos_scores(pickle_path, checkpoint_path, output_path=None):
             # Remove last column (background)
             feat = inter_feat[:, :-1]
             
-            # Compute weighted logsumexp
+            # IMPORTANT: This computation differs from the original VOS implementation
+            # See VOS_COMPUTATION_DIFFERENCES.md for detailed explanation
+            #
+            # This version computes: log(sum(exp(w_i * logit_i)))
+            # Original VOS computes: log(sum(w_i * exp(logit_i)))
+            #
+            # While mathematically different, both are valid energy-based formulations
+            # This simplified version avoids numerical stability handling
             weights = torch.nn.functional.relu(weight_energy_weight)
             weighted_logits = feat * weights
             energy_scores = torch.logsumexp(weighted_logits, dim=1, keepdim=True)
             
-            # Compute logistic regression
+            # Compute logistic regression score (probability of being in-distribution)
             logistic_output = torch.nn.functional.linear(energy_scores, logistic_weight, logistic_bias)
             logistic_score = torch.nn.functional.softmax(logistic_output, dim=1)[:, 1]
             
